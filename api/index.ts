@@ -7,7 +7,7 @@ import { createContext } from "../server/_core/context";
 
 const app = express();
 
-app.get(["/healthz", "/api/health"], (_req: express.Request, res: express.Response) => {
+app.get(["/healthz", "/api/health"], (_req: any, res: any) => {
   res.status(200).json({ status: "ok" });
 });
 
