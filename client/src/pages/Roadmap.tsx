@@ -119,7 +119,7 @@ export default function Roadmap() {
               </div>
             )}
 
-            <Button onClick={handleCreateTask} size="sm" className="gap-2 bg-accent hover:bg-accent/90 text-white">
+            <Button onClick={handleCreateTask} size="sm" className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
               <Plus className="w-4 h-4" />
               Nova Tarefa
             </Button>
