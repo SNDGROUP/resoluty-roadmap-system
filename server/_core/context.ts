@@ -8,6 +8,18 @@ export type TrpcContext = {
   user: User | null;
 };
 
+export const DEFAULT_USER: User = {
+  id: 1,
+  openId: "guest-default",
+  name: "Usuário Resoluty",
+  email: "admin@resoluty.com",
+  loginMethod: "guest",
+  role: "admin",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  lastSignedIn: new Date(),
+};
+
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
@@ -16,8 +28,11 @@ export async function createContext(
   try {
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
-    // Authentication is optional for public procedures.
     user = null;
+  }
+
+  if (!user) {
+    user = DEFAULT_USER;
   }
 
   return {

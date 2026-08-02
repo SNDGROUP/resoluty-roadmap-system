@@ -35,7 +35,14 @@ export const appRouter = router({
         priority: z.array(z.string()).optional(),
         pillar: z.array(z.string()).optional(),
       }).optional())
-      .query(({ ctx, input }) => db.getUserTasks(ctx.user.id, input)),
+      .query(async ({ ctx, input }) => {
+        let tasks = await db.getUserTasks(ctx.user.id, input);
+        if (!tasks || tasks.length === 0) {
+          await seedDatabase(ctx.user.id).catch(() => {});
+          tasks = await db.getUserTasks(ctx.user.id, input);
+        }
+        return tasks;
+      }),
     
     create: protectedProcedure
       .input(z.object({
