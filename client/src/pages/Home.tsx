@@ -1,5 +1,5 @@
-import Roadmap from "./Roadmap";
+import DashboardPage from "./DashboardPage";
 
 export default function Home() {
-  return <Roadmap />;
+  return <DashboardPage />;
 }

@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { Task, Phase } from "@/types/roadmap";
 import { format, addDays, startOfWeek, startOfMonth, startOfQuarter, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { GripHorizontal } from "lucide-react";
+import { GripHorizontal, CheckCircle2, Clock, AlertTriangle, Layers } from "lucide-react";
+import { usePillars } from "@/contexts/PillarContext";
 
 interface RoadmapTimelineProps {
   tasks: Task[];
@@ -12,31 +13,11 @@ interface RoadmapTimelineProps {
   onTaskEdit: (task: Task) => void;
 }
 
-const PILLARS = [
-  "Google",
-  "Redes Sociais",
-  "GoHighLevel",
-  "Make.com",
-  "Ferramentas Complementares",
-];
-
-// Cores dos pilares usando variáveis CSS
-const getPillarColor = (pillar: string): string => {
-  const colorMap: Record<string, string> = {
-    "Google": "var(--pillar-google)",
-    "Redes Sociais": "var(--pillar-redes-sociais)",
-    "GoHighLevel": "var(--pillar-gohighlevel)",
-    "Make.com": "var(--pillar-make)",
-    "Ferramentas Complementares": "var(--pillar-ferramentas)",
-  };
-  return colorMap[pillar] || "#999999";
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  "A Fazer": "bg-gray-400",
-  "Em Andamento": "bg-blue-500",
-  "Concluído": "bg-green-500",
-  "Atrasado": "bg-red-500",
+const STATUS_INDICATORS: Record<string, { label: string; icon: any; class: string }> = {
+  "A Fazer": { label: "A Fazer", icon: Clock, class: "border-gray-400" },
+  "Em Andamento": { label: "Em Andamento", icon: Clock, class: "border-blue-500" },
+  "Concluído": { label: "Concluído", icon: CheckCircle2, class: "border-green-500" },
+  "Atrasado": { label: "Atrasado", icon: AlertTriangle, class: "border-red-500" },
 };
 
 export default function RoadmapTimeline({
@@ -46,19 +27,22 @@ export default function RoadmapTimeline({
   onTaskUpdate,
   onTaskEdit,
 }: RoadmapTimelineProps) {
+  const { pillars, getPillarColor } = usePillars();
   const [draggedTask, setDraggedTask] = useState<number | null>(null);
 
   // Generate timeline dates
   const timelineData = useMemo(() => {
     const today = new Date();
-    const startDate = 
-      viewMode === "week" ? startOfWeek(today, { locale: ptBR }) :
-      viewMode === "month" ? startOfMonth(today) :
-      startOfQuarter(today);
+    const startDate =
+      viewMode === "week"
+        ? startOfWeek(today, { locale: ptBR })
+        : viewMode === "month"
+        ? startOfMonth(today)
+        : startOfQuarter(today);
 
     const dates: Date[] = [];
     let current = new Date(startDate);
-    
+
     const count = viewMode === "week" ? 7 : viewMode === "month" ? 30 : 90;
     for (let i = 0; i < count; i++) {
       dates.push(new Date(current));
@@ -68,16 +52,43 @@ export default function RoadmapTimeline({
     return dates;
   }, [viewMode]);
 
-  // Group tasks by pillar
+  // Group tasks by active pillar
   const tasksByPillar = useMemo(() => {
     const grouped: Record<string, Task[]> = {};
-    PILLARS.forEach(pillar => {
-      grouped[pillar] = tasks.filter(t => t.pillar === pillar).sort((a, b) => 
-        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+    
+    // First initialize for all known pillars
+    pillars.forEach((p) => {
+      grouped[p.name] = [];
+    });
+
+    // Also account for tasks that might have custom pillar names
+    tasks.forEach((t) => {
+      const pillarName = t.pillar || "Outros";
+      if (!grouped[pillarName]) {
+        grouped[pillarName] = [];
+      }
+      grouped[pillarName].push(t);
+    });
+
+    // Sort tasks in each pillar by start date
+    Object.keys(grouped).forEach((key) => {
+      grouped[key].sort(
+        (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
       );
     });
+
     return grouped;
-  }, [tasks]);
+  }, [tasks, pillars]);
+
+  // Active pillar list containing all pillars present in state or tasks
+  const activePillarList = useMemo(() => {
+    const set = new Set<string>();
+    pillars.forEach((p) => set.add(p.name));
+    tasks.forEach((t) => {
+      if (t.pillar) set.add(t.pillar);
+    });
+    return Array.from(set);
+  }, [pillars, tasks]);
 
   const getTaskPosition = (task: Task) => {
     const startDate = new Date(task.startDate);
@@ -93,104 +104,159 @@ export default function RoadmapTimeline({
     return Math.max(1, daysDiff);
   };
 
-  const getTaskOpacity = (task: Task) => {
-    const progressMap: Record<string, number> = {
-      "A Fazer": 0.6,
-      "Em Andamento": 0.85,
-      "Concluído": 1.0,
-      "Atrasado": 0.7,
-    };
-    return progressMap[task.status] || 0.7;
-  };
-
   const CELL_WIDTH = 48;
-  const ROW_HEIGHT = 32;
+  const ROW_HEIGHT = 42;
 
   return (
-    <div className="w-full bg-card rounded-lg border border-border overflow-hidden">
-      {/* Header with dates */}
-      <div className="overflow-x-auto">
-        <div className="flex">
-          <div className="w-48 flex-shrink-0 border-r border-border bg-muted p-4">
-            <h3 className="font-semibold text-foreground text-sm">Pilares Estratégicos</h3>
+    <div className="w-full bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      {/* Timeline Header bar with dates */}
+      <div className="overflow-x-auto border-b border-border bg-muted/40">
+        <div className="flex min-w-max">
+          <div className="w-56 flex-shrink-0 border-r border-border p-3.5 bg-muted/70 flex items-center justify-between">
+            <span className="font-bold text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Layers className="w-4 h-4 text-primary" /> Pilares Estratégicos
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded bg-background text-muted-foreground font-mono">
+              {activePillarList.length}
+            </span>
           </div>
           <div className="flex" style={{ width: `${timelineData.length * CELL_WIDTH}px` }}>
-            {timelineData.map((date, idx) => (
-              <div
-                key={idx}
-                className={`flex-shrink-0 border-r border-border p-2 text-center text-xs ${
-                  idx % 7 === 0 ? "bg-muted/70" : ""
-                }`}
-                style={{ width: `${CELL_WIDTH}px` }}
-              >
-                <div className="font-semibold text-foreground text-xs">
-                  {format(date, "d", { locale: ptBR })}
+            {timelineData.map((date, idx) => {
+              const isToday =
+                format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+              return (
+                <div
+                  key={idx}
+                  className={`flex-shrink-0 border-r border-border p-2 text-center text-xs transition-colors ${
+                    isToday
+                      ? "bg-primary/10 font-bold"
+                      : idx % 7 === 0
+                      ? "bg-muted/70"
+                      : ""
+                  }`}
+                  style={{ width: `${CELL_WIDTH}px` }}
+                >
+                  <div
+                    className={`font-semibold text-xs ${
+                      isToday ? "text-primary" : "text-foreground"
+                    }`}
+                  >
+                    {format(date, "d", { locale: ptBR })}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground uppercase">
+                    {format(date, "EEE", { locale: ptBR }).substring(0, 1)}
+                  </div>
                 </div>
-                <div className="text-muted-foreground text-xs">
-                  {format(date, "EEE", { locale: ptBR }).substring(0, 1).toUpperCase()}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Timeline rows with tasks */}
+      {/* Timeline body with rows */}
       <div className="overflow-x-auto">
-        <div className="flex">
-          {/* Pillar names */}
-          <div className="w-48 flex-shrink-0 border-r border-border">
-            {PILLARS.map(pillar => (
-              <div
-                key={pillar}
-                className="border-b border-border p-4 flex items-center font-semibold text-sm text-foreground bg-muted/30"
-                style={{ height: `${ROW_HEIGHT * 4}px` }}
-              >
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: getPillarColor(pillar) }}
-                  />
-                  <span>{pillar}</span>
+        <div className="flex min-w-max">
+          {/* Pillar Left Labels Column */}
+          <div className="w-56 flex-shrink-0 border-r border-border bg-card/50">
+            {activePillarList.map((pillarName) => {
+              const color = getPillarColor(pillarName);
+              const pTasks = tasksByPillar[pillarName] || [];
+              const rowCount = Math.max(1, pTasks.length);
+
+              return (
+                <div
+                  key={pillarName}
+                  className="border-b border-border px-3 py-2 flex items-center justify-between font-semibold text-sm text-foreground hover:bg-muted/30 transition-colors"
+                  style={{ height: `${rowCount * ROW_HEIGHT + 16}px` }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <div
+                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="truncate text-xs font-bold" title={pillarName}>
+                      {pillarName}
+                    </span>
+                  </div>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted font-mono text-muted-foreground">
+                    {pTasks.length}
+                  </span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Timeline grid and tasks */}
-          <div className="relative" style={{ width: `${timelineData.length * CELL_WIDTH}px` }}>
-            {/* Grid cells */}
-            {PILLARS.map((pillar, pillarIdx) => (
-              <div
-                key={`grid-${pillar}`}
-                className="absolute top-0 left-0 w-full border-b border-border"
-                style={{
-                  top: `${pillarIdx * ROW_HEIGHT * 4}px`,
-                  height: `${ROW_HEIGHT * 4}px`,
-                }}
-              >
-                {timelineData.map((date, dateIdx) => (
-                  <div
-                    key={dateIdx}
-                    className={`absolute top-0 border-r border-b border-border hover:bg-muted/20 transition-colors ${
-                      dateIdx % 7 === 0 ? "bg-muted/10" : "bg-background"
-                    }`}
-                    style={{
-                      left: `${dateIdx * CELL_WIDTH}px`,
-                      width: `${CELL_WIDTH}px`,
-                      height: `${ROW_HEIGHT * 4}px`,
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
+          {/* Timeline Grid & Colored Task Blocks */}
+          <div
+            className="relative"
+            style={{ width: `${timelineData.length * CELL_WIDTH}px` }}
+          >
+            {/* Grid Rows Background */}
+            {activePillarList.map((pillarName, pIdx) => {
+              const pTasks = tasksByPillar[pillarName] || [];
+              const rowCount = Math.max(1, pTasks.length);
 
-            {/* Tasks overlay */}
-            {PILLARS.map((pillar, pillarIdx) =>
-              tasksByPillar[pillar]?.map((task, taskIdx) => {
+              let topOffset = 0;
+              for (let i = 0; i < pIdx; i++) {
+                const prevCount = Math.max(
+                  1,
+                  (tasksByPillar[activePillarList[i]] || []).length
+                );
+                topOffset += prevCount * ROW_HEIGHT + 16;
+              }
+
+              const rowHeightTotal = rowCount * ROW_HEIGHT + 16;
+
+              return (
+                <div
+                  key={`row-grid-${pillarName}`}
+                  className="absolute left-0 w-full border-b border-border"
+                  style={{
+                    top: `${topOffset}px`,
+                    height: `${rowHeightTotal}px`,
+                  }}
+                >
+                  {timelineData.map((date, dateIdx) => {
+                    const isToday =
+                      format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                    return (
+                      <div
+                        key={dateIdx}
+                        className={`absolute top-0 h-full border-r border-border/60 ${
+                          isToday
+                            ? "bg-primary/5 border-primary/30"
+                            : dateIdx % 7 === 0
+                            ? "bg-muted/20"
+                            : "bg-background/40"
+                        }`}
+                        style={{
+                          left: `${dateIdx * CELL_WIDTH}px`,
+                          width: `${CELL_WIDTH}px`,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {/* Task Colored Blocks */}
+            {activePillarList.map((pillarName, pIdx) => {
+              const pTasks = tasksByPillar[pillarName] || [];
+              const pillarColor = getPillarColor(pillarName);
+
+              let topOffset = 0;
+              for (let i = 0; i < pIdx; i++) {
+                const prevCount = Math.max(
+                  1,
+                  (tasksByPillar[activePillarList[i]] || []).length
+                );
+                topOffset += prevCount * ROW_HEIGHT + 16;
+              }
+
+              return pTasks.map((task, tIdx) => {
                 const position = getTaskPosition(task);
                 const width = getTaskWidth(task);
-                const pillarColor = getPillarColor(pillar);
 
                 return (
                   <div
@@ -199,58 +265,59 @@ export default function RoadmapTimeline({
                     draggable
                     onDragStart={() => setDraggedTask(task.id)}
                     onDragEnd={() => setDraggedTask(null)}
-                    className={`absolute rounded px-2 py-1 text-xs font-semibold text-white cursor-pointer flex items-center gap-1 group hover:shadow-lg transition-all pointer-events-auto ${
-                      STATUS_COLORS[task.status]
-                    }`}
+                    className="absolute rounded-md px-2 py-1 text-xs font-semibold cursor-pointer flex items-center justify-between gap-1 group hover:scale-[1.02] hover:shadow-md transition-all z-10 border shadow-sm"
                     style={{
                       left: `${position * CELL_WIDTH}px`,
-                      top: `${pillarIdx * ROW_HEIGHT * 4 + taskIdx * ROW_HEIGHT + 4}px`,
-                      width: `${Math.max(CELL_WIDTH, width * CELL_WIDTH)}px`,
-                      height: `${ROW_HEIGHT - 8}px`,
-                      opacity: draggedTask === task.id ? 0.7 : getTaskOpacity(task),
-                      borderLeft: `4px solid ${pillarColor}`,
-                      display: "flex",
-                      alignItems: "center",
-                      zIndex: draggedTask === task.id ? 50 : 10,
+                      top: `${topOffset + tIdx * ROW_HEIGHT + 8}px`,
+                      width: `${Math.max(CELL_WIDTH * 1.5, width * CELL_WIDTH)}px`,
+                      height: `${ROW_HEIGHT - 12}px`,
+                      backgroundColor: pillarColor,
+                      color: "#FFFFFF",
+                      borderColor: "rgba(255,255,255,0.3)",
+                      opacity: draggedTask === task.id ? 0.6 : 0.95,
                     }}
-                    title={`${task.title} (${task.progress}%)`}
+                    title={`${task.title} - Status: ${task.status} (${task.progress}%)`}
                   >
-                    <GripHorizontal className="w-3 h-3 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                    <span className="truncate flex-1 text-xs">{task.title}</span>
-                    <span className="text-xs opacity-75 flex-shrink-0">{task.progress}%</span>
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <GripHorizontal className="w-3 h-3 opacity-60 group-hover:opacity-100 shrink-0" />
+                      <span className="truncate text-[11px] font-bold text-white drop-shadow-sm">
+                        {task.title}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 bg-black/20 px-1.5 py-0.5 rounded text-[10px] font-mono text-white">
+                      <span>{task.progress}%</span>
+                    </div>
                   </div>
                 );
-              })
-            )}
+              });
+            })}
           </div>
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="border-t border-border p-4 bg-muted/30">
-        <div className="flex flex-wrap gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-foreground">Status:</span>
+      {/* Legend & Pillar Palettes */}
+      <div className="border-t border-border p-3.5 bg-card flex flex-wrap items-center justify-between gap-4 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-foreground">Paleta dos Pilares:</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {activePillarList.map((pName) => {
+              const c = getPillarColor(pName);
+              return (
+                <div key={pName} className="flex items-center gap-1.5">
+                  <span
+                    className="w-3 h-3 rounded-full border border-white/20 shadow-sm"
+                    style={{ backgroundColor: c }}
+                  />
+                  <span className="text-muted-foreground text-[11px]">{pName}</span>
+                </div>
+              );
+            })}
           </div>
-          {Object.entries(STATUS_COLORS).map(([status, color]) => (
-            <div key={status} className="flex items-center gap-2">
-              <div className={`w-4 h-4 rounded ${color}`} />
-              <span className="text-foreground text-xs">{status}</span>
-            </div>
-          ))}
-          
-          <div className="flex items-center gap-2 ml-4">
-            <span className="font-semibold text-foreground">Pilares:</span>
-          </div>
-          {PILLARS.map(pillar => (
-            <div key={pillar} className="flex items-center gap-2">
-              <div 
-                className="w-4 h-4 rounded-full" 
-                style={{ backgroundColor: getPillarColor(pillar) }}
-              />
-              <span className="text-foreground text-xs">{pillar}</span>
-            </div>
-          ))}
+        </div>
+
+        <div className="flex items-center gap-3 text-muted-foreground text-[11px]">
+          <span>💡 Clique em qualquer bloco para editar tarefas ou ajustar progresso.</span>
         </div>
       </div>
     </div>

@@ -152,6 +152,7 @@ export default function Roadmap() {
                 tasks={tasks}
                 onTaskUpdate={() => tasksQuery.refetch()}
                 onTaskDelete={() => tasksQuery.refetch()}
+                onTaskEdit={handleEditTask}
                 filterStatus={filterStatus}
                 onFilterStatusChange={setFilterStatus}
                 filterPriority={filterPriority}

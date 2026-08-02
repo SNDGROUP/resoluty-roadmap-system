@@ -7,22 +7,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Pillar, Status, Priority, Task } from "@/types/roadmap";
+import { Status, Priority, Task } from "@/types/roadmap";
+import { usePillars } from "@/contexts/PillarContext";
 
 interface TaskFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTaskCreated: () => void;
   editingTask?: Task | null;
+  initialPillar?: string;
 }
-
-const PILLARS: Pillar[] = [
-  "Google",
-  "Redes Sociais",
-  "GoHighLevel",
-  "Make.com",
-  "Ferramentas Complementares",
-];
 
 const STATUSES: Status[] = ["A Fazer", "Em Andamento", "Concluído", "Atrasado"];
 const PRIORITIES: Priority[] = ["Baixa", "Média", "Alta", "Crítica"];
@@ -32,11 +26,14 @@ export default function TaskFormDialog({
   onOpenChange,
   onTaskCreated,
   editingTask,
+  initialPillar,
 }: TaskFormDialogProps) {
+  const { pillars, getPillarColor } = usePillars();
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    pillar: "Google" as Pillar,
+    pillar: initialPillar || pillars[0]?.name || "Google",
     assignee: "",
     startDate: new Date().toISOString().split("T")[0],
     dueDate: new Date().toISOString().split("T")[0],
@@ -64,7 +61,7 @@ export default function TaskFormDialog({
       setFormData({
         title: editingTask.title,
         description: editingTask.description || "",
-        pillar: editingTask.pillar,
+        pillar: editingTask.pillar || pillars[0]?.name || "Google",
         assignee: editingTask.assignee || "",
         startDate: new Date(editingTask.startDate).toISOString().split("T")[0],
         dueDate: new Date(editingTask.dueDate).toISOString().split("T")[0],
@@ -81,7 +78,7 @@ export default function TaskFormDialog({
     setFormData({
       title: "",
       description: "",
-      pillar: "Google",
+      pillar: initialPillar || pillars[0]?.name || "Google",
       assignee: "",
       startDate: new Date().toISOString().split("T")[0],
       dueDate: new Date().toISOString().split("T")[0],
@@ -127,46 +124,65 @@ export default function TaskFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-800 shadow-2xl opacity-100 z-50">
         <DialogHeader>
-          <DialogTitle>{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
+            {editingTask ? "Editar Tarefa" : "Nova Tarefa no Roadmap"}
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+        <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="title">Título *</Label>
+            <Label htmlFor="title" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+              Título *
+            </Label>
             <Input
               id="title"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="Digite o título da tarefa"
+              placeholder="Digite o título da tarefa ou marco"
+              className="bg-background"
             />
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
+            <Label htmlFor="description" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+              Descrição
+            </Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Digite a descrição da tarefa"
+              placeholder="Detalhes, entregáveis ou notas de execução..."
               rows={3}
+              className="bg-background"
             />
           </div>
 
           {/* Pillar */}
           <div className="space-y-2">
-            <Label htmlFor="pillar">Pilar Estratégico *</Label>
-            <Select value={formData.pillar} onValueChange={(value) => setFormData({ ...formData, pillar: value as Pillar })}>
-              <SelectTrigger id="pillar">
+            <Label htmlFor="pillar" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+              Pilar Estratégico *
+            </Label>
+            <Select
+              value={formData.pillar}
+              onValueChange={(value) => setFormData({ ...formData, pillar: value })}
+            >
+              <SelectTrigger id="pillar" className="bg-background">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PILLARS.map((pillar) => (
-                  <SelectItem key={pillar} value={pillar}>
-                    {pillar}
+                {pillars.map((p) => (
+                  <SelectItem key={p.id} value={p.name}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: p.color }}
+                      />
+                      <span>{p.name}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -175,33 +191,42 @@ export default function TaskFormDialog({
 
           {/* Assignee */}
           <div className="space-y-2">
-            <Label htmlFor="assignee">Responsável</Label>
+            <Label htmlFor="assignee" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+              Responsável / Equipe
+            </Label>
             <Input
               id="assignee"
               value={formData.assignee}
               onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
-              placeholder="Nome do responsável"
+              placeholder="Ex: Time de Growth, João Silva"
+              className="bg-background"
             />
           </div>
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="startDate">Data de Início *</Label>
+              <Label htmlFor="startDate" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                Data de Início *
+              </Label>
               <Input
                 id="startDate"
                 type="date"
                 value={formData.startDate}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="bg-background"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Data de Vencimento *</Label>
+              <Label htmlFor="dueDate" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                Data de Conclusão *
+              </Label>
               <Input
                 id="dueDate"
                 type="date"
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                className="bg-background"
               />
             </div>
           </div>
@@ -209,9 +234,14 @@ export default function TaskFormDialog({
           {/* Status and Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="status">Status *</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as Status })}>
-                <SelectTrigger id="status">
+              <Label htmlFor="status" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                Status *
+              </Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData({ ...formData, status: value as Status })}
+              >
+                <SelectTrigger id="status" className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -224,9 +254,14 @@ export default function TaskFormDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="priority">Prioridade *</Label>
-              <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value as Priority })}>
-                <SelectTrigger id="priority">
+              <Label htmlFor="priority" className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                Prioridade *
+              </Label>
+              <Select
+                value={formData.priority}
+                onValueChange={(value) => setFormData({ ...formData, priority: value as Priority })}
+              >
+                <SelectTrigger id="priority" className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -241,8 +276,11 @@ export default function TaskFormDialog({
           </div>
 
           {/* Progress */}
-          <div className="space-y-2">
-            <Label htmlFor="progress">Progresso: {formData.progress}%</Label>
+          <div className="space-y-2 pt-2">
+            <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span>Progresso de Execução</span>
+              <span className="text-primary font-bold">{formData.progress}%</span>
+            </div>
             <Slider
               id="progress"
               min={0}
@@ -255,16 +293,20 @@ export default function TaskFormDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="pt-2 border-t border-border mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={createTaskMutation.isPending || updateTaskMutation.isPending}
-            className="bg-accent hover:bg-accent/90"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {createTaskMutation.isPending || updateTaskMutation.isPending ? "Salvando..." : editingTask ? "Atualizar" : "Criar"}
+            {createTaskMutation.isPending || updateTaskMutation.isPending
+              ? "Salvando..."
+              : editingTask
+              ? "Atualizar Tarefa"
+              : "Criar Tarefa"}
           </Button>
         </DialogFooter>
       </DialogContent>
