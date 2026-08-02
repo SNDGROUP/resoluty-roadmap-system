@@ -99,7 +99,7 @@ export default function TaskFormDialog({
         id: editingTask.id,
         title: formData.title,
         description: formData.description || undefined,
-        pillar: formData.pillar,
+        pillar: formData.pillar as any,
         assignee: formData.assignee || undefined,
         startDate: new Date(formData.startDate),
         dueDate: new Date(formData.dueDate),
@@ -111,7 +111,7 @@ export default function TaskFormDialog({
       createTaskMutation.mutate({
         title: formData.title,
         description: formData.description || undefined,
-        pillar: formData.pillar,
+        pillar: formData.pillar as any,
         assignee: formData.assignee || undefined,
         startDate: new Date(formData.startDate),
         dueDate: new Date(formData.dueDate),

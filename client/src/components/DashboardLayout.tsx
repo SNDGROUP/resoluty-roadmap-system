@@ -195,8 +195,9 @@ function DashboardLayoutContent({
                     <SidebarMenuButton
                       isActive={Boolean(isActive)}
                       onClick={() => {
-                        if (item.action) {
-                          item.action();
+                        const itemAction = (item as any).action;
+                        if (itemAction) {
+                          itemAction();
                         } else if (item.path && !item.path.startsWith("#")) {
                           setLocation(item.path);
                         }
