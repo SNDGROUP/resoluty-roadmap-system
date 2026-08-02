@@ -1,0 +1,8 @@
+{
+  "name": "Resoluty Roadmap System",
+  "description": "Roadmap management system for tracking tasks, timelines, and project milestones",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
