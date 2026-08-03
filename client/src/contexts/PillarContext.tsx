@@ -43,6 +43,7 @@ export const DEFAULT_PILLARS: StrategicPillar[] = [
 interface PillarContextType {
   pillars: StrategicPillar[];
   addPillar: (name: string, color: string, description?: string) => void;
+  updatePillar: (id: string, name: string, color: string, description?: string) => void;
   removePillar: (id: string) => void;
   getPillarColor: (pillarName: string) => string;
   getPillar: (pillarName: string) => StrategicPillar | undefined;
@@ -50,7 +51,7 @@ interface PillarContextType {
 
 const PillarContext = createContext<PillarContextType | undefined>(undefined);
 
-const STORAGE_KEY = "resoluty_strategic_pillars_v2";
+const STORAGE_KEY = "resoluty_strategic_pillars_v3";
 
 export function PillarProvider({ children }: { children: React.ReactNode }) {
   const [pillars, setPillars] = useState<StrategicPillar[]>(() => {
@@ -84,7 +85,6 @@ export function PillarProvider({ children }: { children: React.ReactNode }) {
     );
 
     if (existingIndex >= 0) {
-      // Update
       const updated = [...pillars];
       updated[existingIndex] = {
         ...updated[existingIndex],
@@ -93,13 +93,25 @@ export function PillarProvider({ children }: { children: React.ReactNode }) {
       };
       setPillars(updated);
     } else {
-      // Add
       const id = formattedName.toLowerCase().replace(/[^a-z0-9]/g, "-");
       setPillars((prev) => [
         ...prev,
         { id, name: formattedName, color, description },
       ]);
     }
+  };
+
+  const updatePillar = (id: string, name: string, color: string, description?: string) => {
+    const formattedName = name.trim();
+    if (!formattedName) return;
+
+    setPillars((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, name: formattedName, color, description }
+          : p
+      )
+    );
   };
 
   const removePillar = (id: string) => {
@@ -113,7 +125,6 @@ export function PillarProvider({ children }: { children: React.ReactNode }) {
     );
     if (found) return found.color;
 
-    // Fallbacks
     const nameLower = pillarName.toLowerCase();
     if (nameLower.includes("google")) return "#F59E0B";
     if (nameLower.includes("rede") || nameLower.includes("social")) return "#EC4899";
@@ -132,7 +143,7 @@ export function PillarProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PillarContext.Provider
-      value={{ pillars, addPillar, removePillar, getPillarColor, getPillar }}
+      value={{ pillars, addPillar, updatePillar, removePillar, getPillarColor, getPillar }}
     >
       {children}
     </PillarContext.Provider>

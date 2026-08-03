@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useLayoutEffect, useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
@@ -10,14 +10,18 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem("resoluty-theme");
-    if (saved === "dark" || saved === "light") return saved;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("resoluty-theme");
+      if (saved === "dark" || saved === "light") return saved;
+    }
     return "light";
   });
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") {
       root.classList.add("dark");

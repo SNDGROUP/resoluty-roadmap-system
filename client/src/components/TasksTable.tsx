@@ -6,10 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Edit2, Copy, Search, CheckCircle2, Clock, AlertTriangle, ListTodo } from "lucide-react";
+import { Trash2, Edit2, Search, CheckCircle2, Clock, AlertTriangle, ListTodo } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { usePillars } from "@/contexts/PillarContext";
+import HelpTooltip from "@/components/HelpTooltip";
+import { toast } from "sonner";
+import { useDatabase } from "@/contexts/DatabaseContext";
 
 interface TasksTableProps {
   tasks: Task[];
@@ -52,6 +55,7 @@ export default function TasksTable({
 }: TasksTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const { pillars, getPillarColor } = usePillars();
+  const { supabase, isConfigured } = useDatabase();
 
   const filterStatus = externalFilterStatus.length > 0 ? externalFilterStatus : [];
   const filterPriority = externalFilterPriority.length > 0 ? externalFilterPriority : [];
@@ -82,7 +86,14 @@ export default function TasksTable({
   };
 
   const deleteTaskMutation = trpc.tasks.delete.useMutation({
-    onSuccess: onTaskDelete,
+    onSuccess: () => {
+      toast.success("Tarefa excluída com sucesso.");
+      onTaskDelete();
+    },
+    onError: (err) => {
+      console.error("TRPC Delete Error", err);
+      toast.error("Erro ao excluir tarefa.");
+    }
   });
 
   const filteredTasks = useMemo(() => {
@@ -98,10 +109,15 @@ export default function TasksTable({
     });
   }, [tasks, searchTerm, filterStatus, filterPriority, filterPillar]);
 
-  const handleDelete = (taskId: number) => {
-    if (confirm("Tem certeza que deseja deletar esta tarefa?")) {
-      deleteTaskMutation.mutate({ id: taskId });
+  const handleDelete = async (taskId: number) => {
+    if (isConfigured) {
+      try {
+        await supabase.from("tasks").delete().eq("id", taskId);
+      } catch (e) {
+        console.warn("[Supabase Delete fallback]", e);
+      }
     }
+    deleteTaskMutation.mutate({ id: taskId });
   };
 
   const STATUSES: Status[] = ["A Fazer", "Em Andamento", "Concluído", "Atrasado"];
@@ -174,8 +190,8 @@ export default function TasksTable({
 
       {/* 2. SEARCH & FILTERS BAR */}
       <div className="bg-card p-4 rounded-xl border border-border shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-col md:flex-row gap-3 items-center">
+          <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por título ou responsável..."
@@ -185,12 +201,12 @@ export default function TasksTable({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <Select
               value={filterStatus.length > 0 ? filterStatus[0] : "todas"}
               onValueChange={handleFilterStatusChange}
             >
-              <SelectTrigger className="h-9 text-xs bg-background">
+              <SelectTrigger className="h-9 text-xs bg-background min-w-[130px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -207,7 +223,7 @@ export default function TasksTable({
               value={filterPriority.length > 0 ? filterPriority[0] : "todas"}
               onValueChange={handleFilterPriorityChange}
             >
-              <SelectTrigger className="h-9 text-xs bg-background">
+              <SelectTrigger className="h-9 text-xs bg-background min-w-[140px]">
                 <SelectValue placeholder="Prioridade" />
               </SelectTrigger>
               <SelectContent>
@@ -224,7 +240,7 @@ export default function TasksTable({
               value={filterPillar.length > 0 ? filterPillar[0] : "todos"}
               onValueChange={handleFilterPillarChange}
             >
-              <SelectTrigger className="h-9 text-xs bg-background">
+              <SelectTrigger className="h-9 text-xs bg-background min-w-[150px]">
                 <SelectValue placeholder="Pilar Estratégico" />
               </SelectTrigger>
               <SelectContent>
@@ -236,6 +252,16 @@ export default function TasksTable({
                 ))}
               </SelectContent>
             </Select>
+
+            <HelpTooltip
+              title="Filtros & Busca da Tabela"
+              description="Filtre e busque qualquer entrega do roadmap por palavra-chave, estado de execução ou pilar estratégico."
+              steps={[
+                "Digite termos no campo de busca para encontrar responsáveis ou tarefas específicas.",
+                "Selecione um Status para filtrar por 'Em Andamento', 'Concluído' ou 'Atrasado'.",
+                "Filtre por Pilar Estratégico (ex: Google, Redes Sociais) para focar em uma área de negócio.",
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -253,7 +279,20 @@ export default function TasksTable({
               <TableHead className="text-foreground font-bold text-xs uppercase">Status</TableHead>
               <TableHead className="text-foreground font-bold text-xs uppercase">Prioridade</TableHead>
               <TableHead className="text-foreground font-bold text-xs uppercase">Progresso</TableHead>
-              <TableHead className="text-foreground font-bold text-xs uppercase text-right">Ações</TableHead>
+              <TableHead className="text-foreground font-bold text-xs uppercase text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <span>Ações</span>
+                  <HelpTooltip
+                    title="Ações nas Tarefas"
+                    description="Permite editar os detalhes de qualquer entrega existente ou excluí-la do sistema."
+                    steps={[
+                      "Clique no ícone de lápis para alterar título, prazo, status, prioridade ou progresso.",
+                      "Clique na lixeira para remover a tarefa. A alteração é salva imediatamente.",
+                    ]}
+                    size="sm"
+                  />
+                </div>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -9,6 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Status, Priority, Task } from "@/types/roadmap";
 import { usePillars } from "@/contexts/PillarContext";
+import { useDatabase } from "@/contexts/DatabaseContext";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
+import HelpTooltip from "@/components/HelpTooltip";
 
 interface TaskFormDialogProps {
   open: boolean;
@@ -28,7 +32,8 @@ export default function TaskFormDialog({
   editingTask,
   initialPillar,
 }: TaskFormDialogProps) {
-  const { pillars, getPillarColor } = usePillars();
+  const { pillars } = usePillars();
+  const { supabase, isConfigured } = useDatabase();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -44,17 +49,52 @@ export default function TaskFormDialog({
 
   const createTaskMutation = trpc.tasks.create.useMutation({
     onSuccess: () => {
+      toast.success("Tarefa salva com sucesso no roadmap!");
       onTaskCreated();
       resetForm();
     },
+    onError: (err) => {
+      console.error("TRPC Create Error", err);
+      toast.error("Erro ao salvar tarefa. Verifique os campos.");
+    }
   });
 
   const updateTaskMutation = trpc.tasks.update.useMutation({
     onSuccess: () => {
+      toast.success("Tarefa atualizada com sucesso!");
       onTaskCreated();
       resetForm();
     },
+    onError: (err) => {
+      console.error("TRPC Update Error", err);
+      toast.error("Erro ao atualizar tarefa.");
+    }
   });
+
+  const deleteTaskMutation = trpc.tasks.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Tarefa excluída com sucesso.");
+      onTaskCreated();
+      onOpenChange(false);
+      resetForm();
+    },
+    onError: (err) => {
+      console.error("TRPC Delete Error", err);
+      toast.error("Erro ao excluir tarefa.");
+    }
+  });
+
+  const handleDeleteTask = async () => {
+    if (!editingTask) return;
+    if (isConfigured) {
+      try {
+        await supabase.from("tasks").delete().eq("id", editingTask.id);
+      } catch (err) {
+        console.warn("[Supabase Task Delete fallback]", err);
+      }
+    }
+    deleteTaskMutation.mutate({ id: editingTask.id });
+  };
 
   useEffect(() => {
     if (editingTask && open) {
@@ -88,10 +128,43 @@ export default function TaskFormDialog({
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.title.trim()) {
-      alert("Por favor, preencha o título da tarefa");
+      toast.error("Por favor, preencha o título da tarefa");
       return;
+    }
+
+    // Direct Supabase sync if configured
+    if (isConfigured) {
+      try {
+        if (editingTask) {
+          await supabase.from("tasks").update({
+            title: formData.title,
+            description: formData.description || null,
+            pillar: formData.pillar,
+            assignee: formData.assignee || null,
+            start_date: new Date(formData.startDate).toISOString(),
+            due_date: new Date(formData.dueDate).toISOString(),
+            status: formData.status,
+            priority: formData.priority,
+            progress: formData.progress,
+          }).eq("id", editingTask.id);
+        } else {
+          await supabase.from("tasks").insert([{
+            title: formData.title,
+            description: formData.description || null,
+            pillar: formData.pillar,
+            assignee: formData.assignee || null,
+            start_date: new Date(formData.startDate).toISOString(),
+            due_date: new Date(formData.dueDate).toISOString(),
+            status: formData.status,
+            priority: formData.priority,
+            progress: formData.progress,
+          }]);
+        }
+      } catch (err) {
+        console.warn("[Supabase Task Sync fallback]", err);
+      }
     }
 
     if (editingTask) {
@@ -124,10 +197,21 @@ export default function TaskFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-800 shadow-2xl opacity-100 z-50">
+      <DialogContent className="max-w-2xl bg-background text-foreground border-2 border-border shadow-2xl opacity-100 z-50">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
-            {editingTask ? "Editar Tarefa" : "Nova Tarefa no Roadmap"}
+          <DialogTitle className="text-xl font-bold text-foreground flex items-center justify-between">
+            <span>{editingTask ? "Editar Tarefa" : "Nova Tarefa no Roadmap"}</span>
+            <HelpTooltip
+              title="Formulário de Tarefa"
+              description="Preencha os detalhes da entrega para atualizar o roadmap e os relatórios em tempo real."
+              steps={[
+                "Título e Pilar Estratégico são obrigatórios.",
+                "Especifique o Responsável para atribuição clara.",
+                "Ajuste a Data de Início e Término para posicionar corretamente a barra no gráfico de Gantt.",
+                "O Slider de Progresso (0 a 100%) atualiza automaticamente a porcentagem dos pilares.",
+              ]}
+              size="sm"
+            />
           </DialogTitle>
         </DialogHeader>
 
@@ -142,7 +226,7 @@ export default function TaskFormDialog({
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="Digite o título da tarefa ou marco"
-              className="bg-background"
+              className="bg-background text-foreground border-border"
             />
           </div>
 
@@ -157,7 +241,7 @@ export default function TaskFormDialog({
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Detalhes, entregáveis ou notas de execução..."
               rows={3}
-              className="bg-background"
+              className="bg-background text-foreground border-border"
             />
           </div>
 
@@ -170,7 +254,7 @@ export default function TaskFormDialog({
               value={formData.pillar}
               onValueChange={(value) => setFormData({ ...formData, pillar: value })}
             >
-              <SelectTrigger id="pillar" className="bg-background">
+              <SelectTrigger id="pillar" className="bg-background text-foreground border-border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -199,7 +283,7 @@ export default function TaskFormDialog({
               value={formData.assignee}
               onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
               placeholder="Ex: Time de Growth, João Silva"
-              className="bg-background"
+              className="bg-background text-foreground border-border"
             />
           </div>
 
@@ -214,7 +298,7 @@ export default function TaskFormDialog({
                 type="date"
                 value={formData.startDate}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="bg-background"
+                className="bg-background text-foreground border-border"
               />
             </div>
             <div className="space-y-2">
@@ -226,7 +310,7 @@ export default function TaskFormDialog({
                 type="date"
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                className="bg-background"
+                className="bg-background text-foreground border-border"
               />
             </div>
           </div>
@@ -241,7 +325,7 @@ export default function TaskFormDialog({
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value as Status })}
               >
-                <SelectTrigger id="status" className="bg-background">
+                <SelectTrigger id="status" className="bg-background text-foreground border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,7 +345,7 @@ export default function TaskFormDialog({
                 value={formData.priority}
                 onValueChange={(value) => setFormData({ ...formData, priority: value as Priority })}
               >
-                <SelectTrigger id="priority" className="bg-background">
+                <SelectTrigger id="priority" className="bg-background text-foreground border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -293,21 +377,38 @@ export default function TaskFormDialog({
           </div>
         </div>
 
-        <DialogFooter className="pt-2 border-t border-border mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={createTaskMutation.isPending || updateTaskMutation.isPending}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {createTaskMutation.isPending || updateTaskMutation.isPending
-              ? "Salvando..."
-              : editingTask
-              ? "Atualizar Tarefa"
-              : "Criar Tarefa"}
-          </Button>
+        <DialogFooter className="pt-2 border-t border-border mt-4 flex items-center justify-between gap-2">
+          {editingTask ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteTask}
+              disabled={deleteTaskMutation.isPending || createTaskMutation.isPending || updateTaskMutation.isPending}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {deleteTaskMutation.isPending ? "Excluindo..." : "Excluir Tarefa"}
+            </Button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={createTaskMutation.isPending || updateTaskMutation.isPending || deleteTaskMutation.isPending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+            >
+              {createTaskMutation.isPending || updateTaskMutation.isPending
+                ? "Salvando..."
+                : editingTask
+                ? "Atualizar Tarefa"
+                : "Criar Tarefa"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

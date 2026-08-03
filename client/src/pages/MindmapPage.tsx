@@ -11,19 +11,15 @@ import {
   Trash2,
   ChevronRight,
   ChevronDown,
-  Layers,
   Sparkles,
   Edit2,
   Check,
   X,
-  Folder,
-  FolderOpen,
   Building2,
   Users,
   Target,
-  Maximize2,
-  Minimize2,
 } from "lucide-react";
+import HelpTooltip from "@/components/HelpTooltip";
 
 interface NodeItem {
   id: string;
@@ -255,8 +251,8 @@ export default function MindmapPage() {
             depth === 0
               ? "bg-primary/10 border-primary/30 shadow-sm"
               : depth === 1
-              ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs"
-              : "bg-slate-50 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-800/80"
+              ? "bg-card border-border shadow-xs"
+              : "bg-muted/40 border-border/80"
           }`}
           style={{ marginLeft: `${depth * 24}px` }}
         >
@@ -264,7 +260,7 @@ export default function MindmapPage() {
             {hasChildren ? (
               <button
                 onClick={() => toggleCollapse(node.id)}
-                className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors shrink-0"
+                className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors shrink-0"
               >
                 {isCollapsed ? (
                   <ChevronRight className="w-4 h-4" />
@@ -274,7 +270,7 @@ export default function MindmapPage() {
               </button>
             ) : (
               <span className="w-6 h-6 flex items-center justify-center shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
               </span>
             )}
 
@@ -284,7 +280,7 @@ export default function MindmapPage() {
             ) : depth === 1 ? (
               <Target className="w-4 h-4 text-primary shrink-0" />
             ) : (
-              <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             )}
 
             {/* Editable Title or Static */}
@@ -293,7 +289,7 @@ export default function MindmapPage() {
                 <Input
                   value={editingTitle}
                   onChange={(e) => setEditingTitle(e.target.value)}
-                  className="h-8 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
+                  className="h-8 text-xs bg-background text-foreground border-border"
                   autoFocus
                 />
                 <Button
@@ -315,12 +311,12 @@ export default function MindmapPage() {
               </div>
             ) : (
               <div className="min-w-0">
-                <p className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                <p className="font-semibold text-xs sm:text-sm text-foreground truncate">
                   {node.title}
                 </p>
-                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
                   {node.category && (
-                    <span className="font-medium px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">
+                    <span className="font-medium px-1.5 py-0.5 bg-muted rounded">
                       {node.category}
                     </span>
                   )}
@@ -348,7 +344,7 @@ export default function MindmapPage() {
               variant="ghost"
               size="icon"
               onClick={() => startEditNode(node)}
-              className="h-7 w-7 text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
               title="Editar nó"
             >
               <Edit2 className="w-3.5 h-3.5" />
@@ -359,7 +355,7 @@ export default function MindmapPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => deleteNode(node.id)}
-                className="h-7 w-7 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
+                className="h-7 w-7 text-muted-foreground hover:text-rose-600"
                 title="Excluir nó"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -370,7 +366,7 @@ export default function MindmapPage() {
 
         {/* Children Render */}
         {!isCollapsed && hasChildren && (
-          <div className="border-l-2 border-slate-200 dark:border-slate-800 ml-3 pl-1">
+          <div className="border-l-2 border-border ml-3 pl-1">
             {node.children!.map((child) => renderOutlineNode(child, depth + 1))}
           </div>
         )}
@@ -382,29 +378,38 @@ export default function MindmapPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-5 rounded-xl border border-border shadow-sm">
           <div>
             <div className="flex items-center gap-2">
               <div className="p-2 bg-primary/10 rounded-lg text-primary">
                 <Brain className="w-5 h-5" />
               </div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              <h1 className="text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
                 Mapa Mental Estrutural (Outline)
+                <HelpTooltip
+                  title="Mapa Mental & Árvore Estrutural"
+                  description="Representação hierárquica e encadeada da estrutura operacional da Resoluty no formato MindMaster."
+                  steps={[
+                    "Clique nas setas verticais para recolher ou expandir ramos de diretoria.",
+                    "Clique em '+ Sub-nó' para criar novos ramificações e desdobramentos estratégicos.",
+                    "Utilize a ferramenta de edição de texto para modificar o título dos nós em tempo real.",
+                  ]}
+                />
               </h1>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-              Visão hierárquica e ramificada no estilo MindMaster da arquitetura e estrutura da empresa.
+            <p className="text-xs text-muted-foreground mt-1">
+              Visão hierárquica e ramificada da arquitetura e estrutura da empresa.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative w-48 sm:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Buscar nó da estrutura..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 text-xs h-9 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border-slate-200 dark:border-slate-700"
+                className="pl-8 text-xs h-9 bg-background text-foreground border-border"
               />
             </div>
 
@@ -412,14 +417,14 @@ export default function MindmapPage() {
               variant="outline"
               size="sm"
               onClick={expandAll}
-              className="text-xs h-9 border-slate-200 dark:border-slate-700"
+              className="text-xs h-9 border-border"
             >
               Expandir Todos
             </Button>
 
             <Button
               onClick={() => addChildNode(tree.id)}
-              className="gap-1.5 text-xs h-9 font-semibold"
+              className="gap-1.5 text-xs h-9 font-semibold bg-primary text-primary-foreground"
             >
               <Plus className="w-4 h-4" /> Adicionar Pilar/Diretoria
             </Button>
@@ -427,10 +432,10 @@ export default function MindmapPage() {
         </div>
 
         {/* Outline Canvas Container */}
-        <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+        <Card className="bg-card border border-border shadow-sm">
+          <CardHeader className="pb-3 border-b border-border flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" /> Árvore de Organização & Mapeamento
               </CardTitle>
             </div>

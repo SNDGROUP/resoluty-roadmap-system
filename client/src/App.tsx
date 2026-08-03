@@ -5,6 +5,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { PillarProvider } from "./contexts/PillarContext";
+import { DatabaseProvider } from "./contexts/DatabaseContext";
 import Home from "./pages/Home";
 import DashboardPage from "./pages/DashboardPage";
 import KanbanPage from "./pages/KanbanPage";
@@ -51,14 +52,16 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <PillarProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </PillarProvider>
-      </ThemeProvider>
+      <DatabaseProvider>
+        <ThemeProvider>
+          <PillarProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </PillarProvider>
+        </ThemeProvider>
+      </DatabaseProvider>
     </ErrorBoundary>
   );
 }

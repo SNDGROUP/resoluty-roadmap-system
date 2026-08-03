@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
+import { useDatabase } from "@/contexts/DatabaseContext";
 import DashboardLayout from "@/components/DashboardLayout";
 import { usePillars } from "@/contexts/PillarContext";
 import { Input } from "@/components/ui/input";
@@ -31,15 +32,107 @@ import {
   Calendar,
   Sparkles,
   RefreshCw,
-  Users,
   Target,
   Search,
 } from "lucide-react";
+import HelpTooltip from "@/components/HelpTooltip";
 
 export default function DashboardPage() {
-  const { data: tasks = [], isLoading, refetch } = trpc.tasks.list.useQuery();
+  const { supabase, isConfigured } = useDatabase();
+  const { data: trpcTasks = [], isLoading: isTrpcLoading, refetch: refetchTrpc } = trpc.tasks.list.useQuery();
   const { pillars, getPillarColor } = usePillars();
   const [searchTerm, setSearchTerm] = useState("");
+  const [supabaseTasks, setSupabaseTasks] = useState<any[]>([]);
+  const [isSupabaseLoading, setIsSupabaseLoading] = useState(false);
+
+  // Fetch real task data from Supabase 'tasks' table
+  const fetchSupabaseTasks = useCallback(async () => {
+    if (!isConfigured) return;
+    setIsSupabaseLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .order("id", { ascending: true });
+
+      if (error) {
+        console.warn("[Supabase] Error fetching tasks:", error.message);
+      } else if (data) {
+        const mapped = data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          status: item.status,
+          priority: item.priority,
+          pillar: item.pillar,
+          progress: item.progress ?? 0,
+          dueDate: item.due_date || item.dueDate || new Date().toISOString(),
+          startDate: item.start_date || item.startDate || new Date().toISOString(),
+          assignee: item.assignee || "",
+          phaseId: item.phase_id || item.phaseId || null,
+        }));
+        setSupabaseTasks(mapped);
+      }
+    } catch (err) {
+      console.warn("[Supabase] Failed to execute fetch:", err);
+    } finally {
+      setIsSupabaseLoading(false);
+    }
+  }, [supabase, isConfigured]);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchSupabaseTasks();
+  }, [fetchSupabaseTasks]);
+
+  // 24-Hour Automatic Refresh Timer (86,400,000 ms) for CEO View
+  useEffect(() => {
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    const interval = setInterval(() => {
+      console.log("[Dashboard Executive] 24h Auto-Sync triggered");
+      fetchSupabaseTasks();
+      refetchTrpc();
+    }, TWENTY_FOUR_HOURS);
+
+    return () => clearInterval(interval);
+  }, [fetchSupabaseTasks, refetchTrpc]);
+
+  // Supabase real-time subscription listener to refresh task list automatically in real-time
+  useEffect(() => {
+    if (!isConfigured) return;
+
+    const channel = supabase
+      .channel("public:tasks-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks" },
+        (payload) => {
+          console.log("[Supabase Realtime] Task change detected:", payload);
+          fetchSupabaseTasks();
+          refetchTrpc();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, isConfigured, fetchSupabaseTasks, refetchTrpc]);
+
+  // Combined tasks list ensuring real Supabase data is used when present
+  const tasks = useMemo(() => {
+    if (supabaseTasks.length > 0) {
+      return supabaseTasks;
+    }
+    return trpcTasks;
+  }, [supabaseTasks, trpcTasks]);
+
+  const isLoading = isTrpcLoading && isSupabaseLoading;
+
+  const handleManualRefresh = () => {
+    fetchSupabaseTasks();
+    refetchTrpc();
+  };
 
   const filteredTasks = useMemo(() => {
     if (!searchTerm.trim()) return tasks;
@@ -95,16 +188,6 @@ export default function DashboardPage() {
     ];
   }, [metrics]);
 
-  // Priority breakdown
-  const priorityData = useMemo(() => {
-    return [
-      { name: "Baixa", value: filteredTasks.filter((t) => t.priority === "Baixa").length, fill: "#9CA3AF" },
-      { name: "Média", value: filteredTasks.filter((t) => t.priority === "Média").length, fill: "#F59E0B" },
-      { name: "Alta", value: filteredTasks.filter((t) => t.priority === "Alta").length, fill: "#F97316" },
-      { name: "Crítica", value: filteredTasks.filter((t) => t.priority === "Crítica").length, fill: "#EF4444" },
-    ];
-  }, [filteredTasks]);
-
   // Critical / Upcoming Deliverables
   const criticalUpcoming = useMemo(() => {
     return [...filteredTasks]
@@ -122,12 +205,22 @@ export default function DashboardPage() {
               <div className="p-2 bg-primary/10 rounded-lg text-primary">
                 <BarChart3 className="w-5 h-5" />
               </div>
-              <h1 className="text-xl font-bold text-foreground tracking-tight">
+              <h1 className="text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
                 Dashboard Executivo & KPIs
+                <HelpTooltip
+                  title="Dashboard Executivo"
+                  description="Painel de abertura para a alta gestão (CEOs) monitorar o avanço global da empresa, saúde dos pilares estratégicos e status das entregas."
+                  steps={[
+                    "Acompanhe o volume total, progresso médio e taxa de conclusão das entregas.",
+                    "Analise a Saúde dos Pilares Estratégicos (Google, Redes Sociais, GoHighLevel, Make.com) em tempo real.",
+                    "O painel é sincronizado automaticamente a cada 24 horas ou instantaneamente via Supabase Realtime.",
+                    "Clique no botão 'Atualizar' para forçar uma checagem imediata de novos lançamentos.",
+                  ]}
+                />
               </h1>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Visão consolidada de desempenho, progresso dos pilares e status das entregas.
+              Visão consolidada de desempenho, progresso dos pilares e status das entregas em tempo real.
             </p>
           </div>
 
@@ -144,14 +237,14 @@ export default function DashboardPage() {
             </div>
 
             <Badge variant="outline" className="px-3 py-1 font-mono text-xs border-primary/30 text-primary bg-primary/5 hidden sm:flex">
-              <Sparkles className="w-3.5 h-3.5 mr-1" />
+              <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-500" />
               Taxa de Conclusão: {metrics.completionRate}%
             </Badge>
 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => refetch()}
+              onClick={handleManualRefresh}
               disabled={isLoading}
               className="gap-1.5 text-xs h-9"
             >
@@ -250,6 +343,16 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Layers className="w-4 h-4 text-primary" /> Saúde dos Pilares Estratégicos
+              <HelpTooltip
+                title="Saúde dos Pilares"
+                description="Métrica que avalia o progresso médio de tarefas associadas a cada pilar estratégico do seu ecossistema de negócios."
+                steps={[
+                  "Verde (Alta Entrega): Progresso maior ou igual a 80%.",
+                  "Azul (Em Evolução): Progresso entre 40% e 79%.",
+                  "Amarelo (Inicial): Progresso abaixo de 40%.",
+                ]}
+                size="sm"
+              />
             </h3>
             <span className="text-xs text-muted-foreground">
               {pillars.length} pilares ativos
@@ -326,8 +429,13 @@ export default function DashboardPage() {
           {/* Chart 1: Tasks by Pillar */}
           <Card className="bg-card border-border shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold text-foreground">
-                Volume & Entregas por Pilar
+              <CardTitle className="text-sm font-bold text-foreground flex items-center justify-between">
+                <span>Volume & Entregas por Pilar</span>
+                <HelpTooltip
+                  title="Gráfico por Pilar"
+                  description="Compara a quantidade de entregas pendentes, em andamento e concluídas para cada um dos pilares estratégicos."
+                  size="sm"
+                />
               </CardTitle>
               <CardDescription className="text-xs">
                 Comparativo de tarefas totais, concluídas e em andamento por pilar.
@@ -363,8 +471,13 @@ export default function DashboardPage() {
           {/* Chart 2: Status Breakdown Donut */}
           <Card className="bg-card border-border shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold text-foreground">
-                Distribuição de Status
+              <CardTitle className="text-sm font-bold text-foreground flex items-center justify-between">
+                <span>Distribuição de Status</span>
+                <HelpTooltip
+                  title="Distribuição de Status"
+                  description="Visualização gráfica circular proporcional das tarefas de toda a empresa."
+                  size="sm"
+                />
               </CardTitle>
               <CardDescription className="text-xs">
                 Proporção atual do estado de execução dos entregáveis.
@@ -407,6 +520,11 @@ export default function DashboardPage() {
             <div>
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-primary" /> Entregáveis & Prazos da Alta Gestão
+                <HelpTooltip
+                  title="Entregáveis Importantes"
+                  description="Lista priorizada das metas mais iminentes para acompanhamento direto da diretoria executiva."
+                  size="sm"
+                />
               </CardTitle>
               <CardDescription className="text-xs mt-0.5">
                 Próximas tarefas ordenadas por data de entrega e prioridade.

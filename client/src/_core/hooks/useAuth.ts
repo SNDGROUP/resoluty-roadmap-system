@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 
 const DEFAULT_USER = {
   id: 1,
-  openId: "guest-default",
-  name: "Usuário Resoluty",
+  openId: "admin-default",
+  name: "Administrador Resoluty",
   email: "admin@resoluty.com",
   role: "admin",
 };
