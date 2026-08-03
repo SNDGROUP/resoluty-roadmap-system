@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express, { Request, Response, Express } from "express";
+import express from "express";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth.js";
@@ -9,19 +9,19 @@ import { createContext } from "./context.js";
 import { serveStatic, setupVite } from "./vite.js";
 
 async function startServer() {
-  const app: Express = express();
+  const app = express();
   const server = createServer(app);
 
   // Health check routes for container monitoring & Cloud Run probes
-  app.get(["/healthz", "/api/health"], (_req: Request, res: Response) => {
+  app.get(["/healthz", "/api/health"], (_req: any, res: any) => {
     res.status(200).json({ status: "ok" });
   });
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  registerStorageProxy(app);
-  registerOAuthRoutes(app);
+  registerStorageProxy(app as any);
+  registerOAuthRoutes(app as any);
 
   // tRPC API
   app.use(
