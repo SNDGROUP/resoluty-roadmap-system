@@ -1,6 +1,6 @@
 import postgres from "postgres";
-import { InsertUser, InsertTask, Task, InsertPhase, Phase, User } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { InsertUser, InsertTask, Task, InsertPhase, Phase, User } from "../drizzle/schema.js";
+import { ENV } from './_core/env.js';
 
 // Postgres client instance for Supabase
 let pgSql: ReturnType<typeof postgres> | null = null;
@@ -8,7 +8,7 @@ let pgSql: ReturnType<typeof postgres> | null = null;
 let tablesInitialized = false;
 
 export function getPostgresClient() {
-  const connectionString = ENV.postgresUrl || process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  const connectionString = ENV.postgresUrl || process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
   if (!pgSql && connectionString && (connectionString.startsWith("postgres://") || connectionString.startsWith("postgresql://"))) {
     try {
       pgSql = postgres(connectionString, {
@@ -551,12 +551,23 @@ export async function getUserByOpenId(openId: string) {
   const sql = getPostgresClient();
   if (sql) {
     try {
-      const rows = await sql`SELECT * FROM public.users WHERE open_id = ${openId} LIMIT 1`;
+      let rows = await sql`SELECT * FROM public.users WHERE open_id = ${openId} LIMIT 1`;
+      if (rows.length === 0) {
+        const now = new Date();
+        rows = await sql`
+          INSERT INTO public.users (open_id, name, email, login_method, role, created_at, updated_at, last_signed_in)
+          VALUES (${openId}, ${openId === "guest-default" ? "Usuário Resoluty" : "Novo Usuário"}, ${openId === "guest-default" ? "admin@resoluty.com" : null}, 'demo', ${openId === ENV.ownerOpenId ? "admin" : "user"}, ${now}, ${now}, ${now})
+          ON CONFLICT (open_id) DO UPDATE SET last_signed_in = EXCLUDED.last_signed_in
+          RETURNING *
+        `;
+      }
       if (rows.length > 0) {
-        return mapPgUser(rows[0]);
+        const user = mapPgUser(rows[0]);
+        await seedPgIfEmpty(sql, user.id);
+        return user;
       }
     } catch (err) {
-      console.error("[Database] Error fetching user from Postgres:", err);
+      console.error("[Database] Error fetching/creating user from Postgres:", err);
     }
   }
 
@@ -584,7 +595,7 @@ export async function getUserByOpenId(openId: string) {
 
 async function seedPgIfEmpty(sql: any, userId: number) {
   try {
-    const phaseCheck = await sql`SELECT id FROM public.phases WHERE user_id = ${userId} LIMIT 1`;
+    const phaseCheck = await sql`SELECT id FROM public.phases LIMIT 1`;
     if (phaseCheck.length === 0) {
       const now = new Date();
       const initialPhases = [
@@ -617,7 +628,7 @@ async function seedPgIfEmpty(sql: any, userId: number) {
       }
     }
 
-    const taskCheck = await sql`SELECT id FROM public.tasks WHERE user_id = ${userId} LIMIT 1`;
+    const taskCheck = await sql`SELECT id FROM public.tasks LIMIT 1`;
     if (taskCheck.length === 0) {
       const now = new Date();
       const initialTasks = [
@@ -662,7 +673,7 @@ export async function getUserTasks(userId: number, filters?: {
       await seedPgIfEmpty(sql, userId);
       const rows = await sql`
         SELECT * FROM public.tasks 
-        WHERE user_id = ${userId}
+        WHERE 1=1
         ${filters?.status && filters.status.length > 0 ? sql`AND status = ANY(${filters.status})` : sql``}
         ${filters?.priority && filters.priority.length > 0 ? sql`AND priority = ANY(${filters.priority})` : sql``}
         ${filters?.pillar && filters.pillar.length > 0 ? sql`AND pillar = ANY(${filters.pillar})` : sql``}
@@ -809,7 +820,7 @@ export async function getUserPhases(userId: number) {
   if (sql) {
     try {
       await seedPgIfEmpty(sql, userId);
-      const rows = await sql`SELECT * FROM public.phases WHERE user_id = ${userId} ORDER BY created_at DESC`;
+      const rows = await sql`SELECT * FROM public.phases WHERE 1=1 ORDER BY created_at DESC`;
       return rows.map(mapPgPhase);
     } catch (err) {
       console.error("[Database] Error fetching phases from Postgres:", err);

@@ -1,4 +1,4 @@
-import { createTask, createPhase, getUserPhases, getUserTasks } from "./db";
+import { createTask, createPhase, getUserPhases, getUserTasks } from "./db.js";
 
 const INITIAL_TASKS_TEMPLATE = [
   // Google Pillar
