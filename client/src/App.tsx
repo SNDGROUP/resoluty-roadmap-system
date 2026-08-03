@@ -12,6 +12,7 @@ import KanbanPage from "./pages/KanbanPage";
 import MindmapPage from "./pages/MindmapPage";
 import Roadmap from "./pages/Roadmap";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { Analytics } from "@vercel/analytics/react";
 
 function Router() {
   return (
@@ -58,6 +59,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <Router />
+              <Analytics />
             </TooltipProvider>
           </PillarProvider>
         </ThemeProvider>
