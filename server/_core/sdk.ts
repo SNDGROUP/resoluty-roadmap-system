@@ -272,21 +272,19 @@ class SDKServer {
     const session = await this.verifySession(sessionToken);
 
     if (!session) {
-      if (!ENV.isProduction || !ENV.oAuthServerUrl) {
-        let demoUser = await db.getUserByOpenId("demo_user_openid");
-        if (!demoUser) {
-          await db.upsertUser({
-            openId: "demo_user_openid",
-            name: "Usuário Resoluty",
-            email: "demo@resoluty.com",
-            loginMethod: "demo",
-            role: "admin",
-            lastSignedIn: new Date(),
-          });
-          demoUser = await db.getUserByOpenId("demo_user_openid");
-        }
-        if (demoUser) return demoUser;
+      let adminUser = await db.getUserByOpenId("admin_user_openid");
+      if (!adminUser) {
+        await db.upsertUser({
+          openId: "admin_user_openid",
+          name: "Administrador Resoluty",
+          email: "admin@resoluty.com",
+          loginMethod: "admin",
+          role: "admin",
+          lastSignedIn: new Date(),
+        });
+        adminUser = await db.getUserByOpenId("admin_user_openid");
       }
+      if (adminUser) return adminUser;
       throw ForbiddenError("Invalid session cookie");
     }
 

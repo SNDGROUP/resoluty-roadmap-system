@@ -5,13 +5,13 @@ import * as db from "../db.js";
 import { getSessionCookieOptions } from "./cookies.js";
 import { sdk } from "./sdk.js";
 
-function getQueryParam(req: any, key: string): string | undefined {
+function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query?.[key];
   return typeof value === "string" ? value : undefined;
 }
 
-export function registerOAuthRoutes(app: any) {
-  app.get("/api/oauth/callback", async (req: any, res: any) => {
+export function registerOAuthRoutes(app: Express) {
+  app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");
 
@@ -21,10 +21,10 @@ export function registerOAuthRoutes(app: any) {
     }
 
     // CSRF guard: the nonce in `state` must match the one-time cookie that
-    // startLogin set in the browser that began this login. An attacker can
-    // forge `state`, but cannot plant this cookie in the victim's browser.
+    // startLogin set in the browser that began this login.
     const { nonce } = decodeOAuthState(state);
-    const expectedNonce = parseCookieHeader(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
+    const cookieHeader = req.headers.cookie;
+    const expectedNonce = cookieHeader ? parseCookieHeader(cookieHeader)[OAUTH_STATE_COOKIE] : undefined;
     if (!nonce || nonce !== expectedNonce) {
       res.status(403).json({ error: "invalid oauth state" });
       return;
@@ -53,7 +53,7 @@ export function registerOAuthRoutes(app: any) {
         expiresInMs: ONE_YEAR_MS,
       });
 
-      const cookieOptions = getSessionCookieOptions(req);
+      const cookieOptions = getSessionCookieOptions(req as any);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       res.redirect(302, "/");

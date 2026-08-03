@@ -556,7 +556,7 @@ export async function getUserByOpenId(openId: string) {
         const now = new Date();
         rows = await sql`
           INSERT INTO public.users (open_id, name, email, login_method, role, created_at, updated_at, last_signed_in)
-          VALUES (${openId}, ${openId === "guest-default" ? "Usuário Resoluty" : "Novo Usuário"}, ${openId === "guest-default" ? "admin@resoluty.com" : null}, 'demo', ${openId === ENV.ownerOpenId ? "admin" : "user"}, ${now}, ${now}, ${now})
+          VALUES (${openId}, 'Administrador Resoluty', 'admin@resoluty.com', 'admin', 'admin', ${now}, ${now}, ${now})
           ON CONFLICT (open_id) DO UPDATE SET last_signed_in = EXCLUDED.last_signed_in
           RETURNING *
         `;
@@ -579,10 +579,10 @@ export async function getUserByOpenId(openId: string) {
     user = {
       id,
       openId,
-      name: "Usuário Resoluty",
-      email: "demo@resoluty.com",
-      loginMethod: "oauth",
-      role: openId === ENV.ownerOpenId ? "admin" : "user",
+      name: "Administrador Resoluty",
+      email: "admin@resoluty.com",
+      loginMethod: "admin",
+      role: "admin",
       createdAt: now,
       updatedAt: now,
       lastSignedIn: now,

@@ -1,19 +1,19 @@
 import "dotenv/config";
-import express from "express";
+import express, { Request, Response, Express } from "express";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
-import { registerStorageProxy } from "./storageProxy";
-import { appRouter } from "../routers";
-import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { registerOAuthRoutes } from "./oauth.js";
+import { registerStorageProxy } from "./storageProxy.js";
+import { appRouter } from "../routers.js";
+import { createContext } from "./context.js";
+import { serveStatic, setupVite } from "./vite.js";
 
 async function startServer() {
-  const app = express();
+  const app: Express = express();
   const server = createServer(app);
 
   // Health check routes for container monitoring & Cloud Run probes
-  app.get(["/healthz", "/api/health"], (_req, res) => {
+  app.get(["/healthz", "/api/health"], (_req: Request, res: Response) => {
     res.status(200).json({ status: "ok" });
   });
 

@@ -10,10 +10,10 @@ export type TrpcContext = {
 
 export const DEFAULT_USER: User = {
   id: 1,
-  openId: "guest-default",
-  name: "Usuário Resoluty",
+  openId: "admin-default",
+  name: "Administrador Resoluty",
   email: "admin@resoluty.com",
-  loginMethod: "guest",
+  loginMethod: "admin",
   role: "admin",
   createdAt: new Date(),
   updatedAt: new Date(),
