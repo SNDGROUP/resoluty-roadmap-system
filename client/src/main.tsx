@@ -11,8 +11,10 @@ function Root() {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        refetchOnWindowFocus: false,
-        retry: false,
+        refetchOnWindowFocus: true,
+        refetchInterval: 3000,
+        staleTime: 1000,
+        retry: 2,
       },
     },
   }));
