@@ -5,6 +5,8 @@ import { ENV } from './_core/env';
 // Postgres client instance for Supabase
 let pgSql: ReturnType<typeof postgres> | null = null;
 
+let tablesInitialized = false;
+
 export function getPostgresClient() {
   const connectionString = ENV.postgresUrl || process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (!pgSql && connectionString && (connectionString.startsWith("postgres://") || connectionString.startsWith("postgresql://"))) {
@@ -15,12 +17,60 @@ export function getPostgresClient() {
         idle_timeout: 20,
         connect_timeout: 10,
       });
-      console.log("[Database] Connected to Supabase PostgreSQL");
+      console.log("[Database] Connected to PostgreSQL");
     } catch (err) {
       console.warn("[Database] Failed to connect to Postgres:", err);
       pgSql = null;
     }
   }
+
+  if (pgSql && !tablesInitialized) {
+    tablesInitialized = true;
+    pgSql`
+      CREATE TABLE IF NOT EXISTS public.users (
+        id SERIAL PRIMARY KEY,
+        open_id VARCHAR(64) UNIQUE NOT NULL,
+        name TEXT,
+        email VARCHAR(320),
+        login_method VARCHAR(64),
+        role VARCHAR(32) DEFAULT 'user' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        last_signed_in TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS public.phases (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        pillar VARCHAR(64) NOT NULL,
+        description TEXT,
+        start_date TIMESTAMP NOT NULL,
+        end_date TIMESTAMP NOT NULL,
+        color VARCHAR(7) DEFAULT '#1A237E' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS public.tasks (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        phase_id INT,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        pillar VARCHAR(64) NOT NULL,
+        assignee VARCHAR(255),
+        start_date TIMESTAMP NOT NULL,
+        due_date TIMESTAMP NOT NULL,
+        status VARCHAR(64) DEFAULT 'A Fazer' NOT NULL,
+        priority VARCHAR(64) DEFAULT 'Média' NOT NULL,
+        progress INT DEFAULT 0 NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `.catch(err => {
+      console.warn("[Database] Table auto-creation warning:", err);
+    });
+  }
+
   return pgSql;
 }
 
