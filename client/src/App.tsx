@@ -12,6 +12,7 @@ import KanbanPage from "./pages/KanbanPage";
 import MindmapPage from "./pages/MindmapPage";
 import Roadmap from "./pages/Roadmap";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 function Router() {
   return (
@@ -58,6 +59,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <Router />
+              <SpeedInsights />
             </TooltipProvider>
           </PillarProvider>
         </ThemeProvider>
